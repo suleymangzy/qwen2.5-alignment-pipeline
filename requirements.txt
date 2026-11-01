@@ -1,0 +1,22 @@
+torch>=2.2
+transformers>=4.50
+datasets>=2.19
+trl>=0.20
+peft>=0.14
+bitsandbytes>=0.45; platform_system != "Darwin"
+accelerate>=0.30
+sentence-transformers>=3.0
+scikit-learn>=1.4
+deap>=1.4
+numpy
+pandas
+pyarrow
+matplotlib
+scipy
+sympy
+joblib
+tqdm
+packaging
+openai>=1.40
+ipykernel
+nbformat

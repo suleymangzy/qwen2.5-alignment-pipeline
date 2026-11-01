@@ -1,83 +1,58 @@
-# LLM Hizalama Deneyi: SFT → RLHF (PPO) → DPO — Qwen2.5-0.5B
+# gp-stratified-sft-selection
 
-Bu proje, deneysel kurguda tanımlanan hizalama (alignment) boru hattını
-(pipeline) uygular: **Qwen/Qwen2.5-0.5B** taban modeli üzerinde Gözetimli
-İnce Ayar (SFT) → Ödül Modeli + PPO (RLHF, çoklu-LoRA-adaptör yöntemi) → DPO.
+**GP Destekli Tabakalı SFT Veri Seçimi ve Çift Ölçekli (Proxy → Target) Hizalama**
 
-## Klasör Yapısı
+Qwen2.5-0.5B-Base üzerinde **genetik programlama (DEAP)** ile bir SFT örnek-puanlama formülü ($f_{GP}^*$) evrimleştirilir;
+formül, 20 anlamsal kümeden **tabakalı** 1.000 örnek seçer ve seçim **Qwen2.5-3B-Base** hedef modeline aktarılır.
+Hedef modelde 5 SFT kıyas modeli ile iki hatlı tercih optimizasyonu (GRPO; DPO ve R-DPO) karşılaştırılır.
 
-```
-Uygulama/
-├── Datasets/                               # Yerel veri kümeleri (önceden mevcut)
-│   ├── HuggingFaceH4-no_robots/            # SFT gösterim verisi (Rajani vd., 2023)
-│   └── Anthropichh-rlhf/                   # Tercih verisi (Bai vd., 2022)
-├── src/
-│   └── alignment_pipeline.py               # Tüm fonksiyonların bulunduğu ortak kütüphane
-├── notebooks/
-│   ├── 01_Data_Analysis.ipynb
-│   ├── 02_SFT_Training.ipynb
-│   ├── 03_RLHF_Training.ipynb              # Ödül Modeli + PPO (çoklu-adaptör)
-│   ├── 04_DPO_Training.ipynb
-│   ├── 05_Algorithm_Comparison_Quantitative.ipynb
-│   └── 06_Algorithm_Comparison_Qualitative.ipynb   # LLM-as-a-Judge
-└── outputs/                                 # Çalıştırma sonrası üretilir (adaptörler, loglar, grafikler)
-```
-
-## Veri Kümeleri
-
-`Datasets/` klasörü büyük dosya boyutları nedeniyle (bir hh-rlhf dosyası
-GitHub'ın 100MB tekil dosya sınırını aşmaktadır) bu depoya **dahil
-edilmemiştir** (`.gitignore`). Çalıştırmadan önce aşağıdaki iki veri kümesini
-Hugging Face Hub'dan indirip `Datasets/` altına, [src/alignment_pipeline.py](src/alignment_pipeline.py)
-içindeki yükleyicilerin beklediği klasör yapısıyla yerleştirin:
-
-- `Datasets/HuggingFaceH4-no_robots/` ← [HuggingFaceH4/no_robots](https://huggingface.co/datasets/HuggingFaceH4/no_robots) (`train_sft`, `test_sft` parquet dosyaları)
-- `Datasets/Anthropichh-rlhf/<subset>/` ← [Anthropic/hh-rlhf](https://huggingface.co/datasets/Anthropic/hh-rlhf) (`harmless_base`, `helpful_base`, `helpful_online`, `helpful_rejection_sampled` alt kümeleri, `train.jsonl`/`test.jsonl`)
-
-## Google Colab Pro Üzerinde Çalıştırma
-
-1. `Uygulama/` klasörünün tamamını (özellikle `Datasets/` ve `src/`) Google
-   Drive'ınıza yükleyin, örneğin `MyDrive/Uygulama`.
-2. Her defterin ilk kod hücresindeki `PROJECT_ROOT` değişkenini kendi Drive
-   yolunuza göre güncelleyin (varsayılan: `/content/drive/MyDrive/Uygulama`).
-3. Defterleri sırasıyla çalıştırın:
-   `01_Data_Analysis` → `02_SFT_Training` → `03_RLHF_Training` →
-   `04_DPO_Training` → `05_Algorithm_Comparison_Quantitative` →
-   `06_Algorithm_Comparison_Qualitative`.
-4. Çalışma zamanı türü olarak bir GPU (A100 veya L4) seçin
-   (Çalışma zamanı → Çalışma zamanı türünü değiştir → GPU).
-
-Her defter, `src/alignment_pipeline.py` modülünü `sys.path`'e ekleyip
-`import alignment_pipeline as ap` ile içe aktarır; bu nedenle `src/` klasörü
-mutlaka `notebooks/` ile aynı üst klasörde (`Uygulama/`) bulunmalıdır.
-
-## Yazılım Sürümleri (Pinned)
-
-API kararlılığı için (özellikle TRL'nin klasik `PPOTrainer` +
-`AutoModelForCausalLMWithValueHead` çoklu-adaptör RL özelliği), aşağıdaki
-sürümler sabitlenmiştir:
+## Proje yapısı
 
 ```
-transformers==4.44.2   peft==0.11.1        bitsandbytes==0.43.1
-trl==0.9.6              accelerate==0.32.1  datasets==2.20.0
+gp-stratified-sft-selection/
+├── src/                          # YALNIZCA fonksiyon/sınıf kütüphanesi (import edilir, çalıştırılmaz)
+│   ├── common.py                 # sabitler, veri yükleyiciler, 4-bit NF4, VRAM temizliği, maliyet ölçümü
+│   ├── features.py               # Aşama 1: bge-small gömme + KMeans(20) + 6 öznitelik (Qwen2.5-0.5B)
+│   ├── gp_evolution.py           # Aşama 2: DEAP GP, önbellekli tabakalı vekil uygunluk, LoRA sıfırlamalı mikro-SFT
+│   ├── alignment.py              # Aşama 3: 5 SFT + GRPO (harici ödül) + DPO + RDPOTrainer
+│   ├── evaluation.py             # Aşama 4: üretim, D_KL, gpt-4o hakem, LC kazanma oranı, bootstrap GA
+│   └── analysis.py               # akademik tablo/şekil yardımcıları (numaralı, 300 dpi + LaTeX)
+├── notebooks/                    # raporlanabilir çıktıları üreten defterler
+│   ├── 00_setup_and_data.ipynb
+│   ├── 01_features_and_clustering.ipynb
+│   ├── 02_gp_evolution.ipynb
+│   ├── 03_target_sft_and_alignment.ipynb
+│   └── 04_evaluation_and_judge.ipynb
+├── Datasets/                     # (isteğe bağlı) yerel veri; defterler load_dataset ile Hub'dan da indirebilir
+├── outputs/                      # çalıştırma sonrası üretilir (git'e dahil değil)
+│   ├── features/ gp/ models/ generations/ metrics/ judge/
+│   ├── figures/                  # fig_*.png (300 dpi) + fig_*.pdf
+│   └── tables/                   # tab_*.csv + tab_*.tex
+└── requirements.txt
 ```
 
-## Boru Hattı Özeti
+`src/` modülleri komut satırı betiği değil kütüphanedir; her aşamanın girişi bir fonksiyondur:
 
-| Aşama | Defter | Yöntem | Çıktı |
-|---|---|---|---|
-| Veri Analizi | `01_Data_Analysis` | — | Gözlemler, grafikler |
-| SFT | `02_SFT_Training` | `trl.SFTTrainer` + LoRA | `Model_SFT` (`outputs/sft/merged_model`) |
-| Ödül Modeli | `03_RLHF_Training` (Adım A) | `trl.RewardTrainer` + LoRA (SEQ_CLS) | `outputs/reward_model/adapter` |
-| PPO (RLHF) | `03_RLHF_Training` (Adım B) | `trl.PPOTrainer` (çoklu-adaptör) | `Model_RLHF` (`outputs/ppo/ppo_adapter`) |
-| DPO | `04_DPO_Training` | `trl.DPOTrainer` | `Model_DPO` (`outputs/dpo/adapter`) |
-| Nicel Karşılaştırma | `05_Algorithm_Comparison_Quantitative` | Kayıp eğrileri, yanıt uzunluğu, $D_{KL}$ | Grafikler, özet tablo |
-| Nitel Karşılaştırma | `06_Algorithm_Comparison_Qualitative` | LLM-as-a-Judge (GPT-4o / Llama-3.1-70B-Instruct) | Win-Rate matrisi |
+| Aşama | Giriş fonksiyonu | Ek |
+|---|---|---|
+| 1 | `features.run_feature_extraction(limit=0, force=False)` | |
+| 2 | `gp_evolution.run_gp_evolution(pop=16, gens=10, steps=60)` | `dry_run=True` GPU'suz mantık testi |
+| 3 | `alignment.run_alignment(stage="sft"\|"grpo"\|"dpo"\|"rdpo"\|"all")` | `alignment.rdpo_logit_check()` |
+| 4 | `evaluation.run_evaluation(stage="generate"\|"plots"\|"judge"\|"all")` | |
 
-## Üretim Senaryosu (Opsiyonel)
+## Google Colab'da çalıştırma
 
-Bütçe elverdiğinde, `alignment_pipeline.ExperimentConfig.production_model_id`
-(`Qwen/Qwen2.5-7B`) kullanılarak aynı fonksiyonlarla LoRA ya da Tam İnce Ayar
-(Full Fine-Tuning) uygulanabilir; sadece defterlerdeki `config.base_model_id`
-yerine `config.production_model_id` geçirilmesi ve donanıma göre
-batch/gradient-accumulation değerlerinin güncellenmesi yeterlidir.
+1. Depoyu Drive'a yükleyin veya klonlayın (`MyDrive/gp-stratified-sft-selection`). Veri kümeleri `load_dataset` ile otomatik indirilir; `Datasets/` gerekmez.
+2. Çalışma zamanı: **A100 80 GB** (önerilen) veya L4 24 GB. Defterleri **sırayla** çalıştırın (00 → 04).
+3. İlk hücrede (00) `%pip install -r requirements.txt` satırının yorumunu kaldırın.
+4. Defter 04'te `OPENAI_API_KEY` (Colab *Secrets* veya `getpass`) gerekir; diğerlerinde gerekmez.
+5. Oturum kesilirse yeniden çalıştırın: SFT/DPO/GRPO adaptörleri, GP `fitness_cache` ve hakem yargıları diskten devam eder.
+
+## Tasarım kararları ve notlar
+
+* **Veri sızıntısı:** `no_robots` test bölümü kategoriye göre tabakalı iki yarıya bölünür — $D_{val\text{-}250}$ (GP uygunluğu) ve **ayrık** $D_{test\text{-}250}$ (nihai değerlendirme).
+* **Vekil model tek sefer yüklenir;** her birey için LoRA ağırlıkları `reset_lora_parameters` ile sıfırlanır; aynı alt küme `fitness_cache` ile yeniden eğitilmez.
+* **R-DPO**, TRL kaybını kopyalamadan referans log-olasılıklarını $-s\alpha|y|/\beta$ kadar kaydırarak uygulanır; özdeşlik `rdpo_logit_check()` ile sayısal olarak doğrulanır. İşaret `rdpo_sign` ile seçilir (+1: Park vd. 2024 Eş. 9; −1: proje notundaki ifade).
+* **LC kazanma oranı:** uzunluk farkına göre lojistik düzeltme (AlpacaEval-LC ilkesi); %95 güven aralığı istem düzeyinde bootstrap, anlamlılık için işaret testi (+ Holm).
+* **GRPO**, 10k tercih alt kümesinden `--grpo-prompts` (varsayılan 1.000) istemle çalışır; GPU bütçesine göre artırılabilir.
+* Taban modeller: `Qwen/Qwen2.5-0.5B` ve `Qwen/Qwen2.5-3B` (Hugging Face'teki *Base* sürümleridir). Ortam değişkenleriyle (`PROXY_MODEL`, `TARGET_MODEL`, `REWARD_MODEL`) değiştirilebilir.

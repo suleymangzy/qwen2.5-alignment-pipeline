@@ -1,18 +1,17 @@
-# Raw datasets (large files, publicly available on the Hugging Face Hub —
-# see README.md for download instructions). Excluded to keep the repo small
-# and because one hh-rlhf split exceeds GitHub's 100MB per-file limit.
+# Yerel veri kümeleri (Hugging Face'ten indirilir; büyük dosyalar)
 Datasets/
 
-# Training outputs (adapters, checkpoints, logs, generated plots)
+# Deney çıktıları (adaptörler, özellikler, günlükler, şekiller, tablolar)
 outputs/
 
-# Python
+# Python / Jupyter
 __pycache__/
 *.pyc
-*.pyo
 .ipynb_checkpoints/
+.venv/
+venv/
 
-# OS / editor
+# OS / editör
 .DS_Store
 Thumbs.db
 .vscode/
