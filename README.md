@@ -42,7 +42,9 @@ gp-stratified-sft-selection/
 
 ## Google Colab'da çalıştırma
 
-1. Depoyu Drive'a yükleyin veya klonlayın (`MyDrive/gp-stratified-sft-selection`). Veri kümeleri `load_dataset` ile otomatik indirilir; `Datasets/` gerekmez.
+1. Defterlerin ilk hücresi, Colab'da depoyu `/content/gp-stratified-sft-selection` altına otomatik klonlar (Drive gerekmez). `src/` değişiklikleriniz GitHub'a push edilmiş olmalıdır. Veri kümeleri `load_dataset` ile otomatik indirilir; `Datasets/` gerekmez.
+   - **Çıktılar:** VM yerel diske yazamaz; `outputs/` VM'de oluşur ve oturum kapanınca silinir. Her defterin son hücresi `export_outputs()` ile `outputs_0X.zip` üretip indirmeyi dener (olmazsa Colab *Contents* görünümünden `/content/outputs_0X.zip` dosyasını indirin). Zip'i proje köküne açın (`outputs/` oluşur).
+   - **Sonraki defter / yeni oturum:** yeni VM'de `outputs/` boştur. Yerel `outputs/` klasörüne sağ tıklayıp *Upload to Colab* ile `/content/gp-stratified-sft-selection/` altına yükleyin, sonra defteri çalıştırın.
 2. Çalışma zamanı: **A100 80 GB** (önerilen) veya L4 24 GB. Defterleri **sırayla** çalıştırın (00 → 04).
 3. İlk hücrede (00) `%pip install -r requirements.txt` satırının yorumunu kaldırın.
 4. Defter 04'te `OPENAI_API_KEY` (Colab *Secrets* veya `getpass`) gerekir; diğerlerinde gerekmez.

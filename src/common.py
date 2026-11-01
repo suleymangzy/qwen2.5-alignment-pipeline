@@ -1,4 +1,4 @@
-﻿"""
+"""
 Modül 0 - Ortak yapılandırma ve yardımcı fonksiyonlar.
 
 Tüm aşamalar (01..04) bu modülü içe aktarır. İçerik:
@@ -37,6 +37,40 @@ FIG_DIR = OUT / "figures"
 JUDGE_DIR = OUT / "judge"
 for _d in (FEAT_DIR, GP_DIR, MODEL_DIR, GEN_DIR, METRIC_DIR, FIG_DIR, JUDGE_DIR):
     _d.mkdir(parents=True, exist_ok=True)
+
+
+def export_outputs(name: str = "outputs_backup", include_models: bool = True, download: bool = True) -> Path | None:
+    """Colab VM diskindeki OUT klasörünü tek bir zip'e paketler ve yerel makineye indirmeyi dener.
+
+    Colab uzantısında çekirdek uzak makinede çalışır ve VM kapanınca outputs/ silinir; VM yerel diske yazamaz.
+    Bu nedenle her defterin sonunda çağrılır. İndirme otomatik başlamazsa zip, VS Code'un Colab
+    "Contents" görünümünden (/content/<name>.zip) indirilebilir. Yerelde çalışırken çıktılar zaten
+    yerel olduğundan hiçbir şey yapmaz. Yerelde geri yüklemek için zip'i proje köküne açın.
+    """
+    import sys
+    import zipfile
+
+    if "google.colab" not in sys.modules:
+        print("Yerel çalışma: çıktılar zaten", OUT)
+        return None
+
+    zip_path = Path("/content") / f"{name}.zip"
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for p in sorted(OUT.rglob("*")):
+            rel = p.relative_to(ROOT)
+            if not p.is_file() or any(part.startswith("checkpoint-") for part in rel.parts):
+                continue  # ara kontrol noktaları (optimizer durumu) büyük ve yeniden üretilebilir
+            if not include_models and MODEL_DIR in p.parents:
+                continue
+            zf.write(p, rel.as_posix())
+    print(f"Paketlendi: {zip_path} ({zip_path.stat().st_size / 2**20:,.1f} MB)")
+    if download:
+        try:
+            from google.colab import files
+            files.download(str(zip_path))
+        except Exception as exc:  # noqa: BLE001
+            print(f"[uyarı] Otomatik indirme başarısız ({type(exc).__name__}); zip'i Colab 'Contents' görünümünden indirin.")
+    return zip_path
 
 # --------------------------------------------------------------------------- #
 # Sabitler
